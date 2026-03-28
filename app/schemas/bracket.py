@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.match import MatchStatus
+from app.models.tournament import SeriesFormat
 
 
 class MatchPublic(BaseModel):
@@ -11,9 +12,13 @@ class MatchPublic(BaseModel):
     tournament_id: uuid.UUID
     round: int
     match_number: int
+    format: SeriesFormat
+    games_to_win: int
     participant_1: uuid.UUID | None
     participant_2: uuid.UUID | None
     winner_id: uuid.UUID | None
+    team_1_wins: int
+    team_2_wins: int
     score_1: int
     score_2: int
     status: MatchStatus

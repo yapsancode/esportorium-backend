@@ -5,11 +5,15 @@ from sqlmodel import Session, func, select
 
 from app.models.match import Match, MatchStatus
 from app.models.registration import Registration, RegistrationStatus
-from app.models.tournament import Tournament, TournamentFormat
+from app.models.tournament import SeriesFormat, Tournament, TournamentFormat
 
 
 def _next_power_of_two(n: int) -> int:
     return 1 << (n - 1).bit_length()
+
+
+def _games_to_win(fmt: SeriesFormat) -> int:
+    return {SeriesFormat.bo1: 1, SeriesFormat.bo3: 2, SeriesFormat.bo5: 3}[fmt]
 
 
 def generate_bracket(tournament_id: uuid.UUID, session: Session) -> list[Match]:
@@ -36,6 +40,9 @@ def generate_bracket(tournament_id: uuid.UUID, session: Session) -> list[Match]:
     bracket_size = _next_power_of_two(n)
     participant_ids += [None] * (bracket_size - n)
 
+    series_fmt = tournament.match_format
+    gtw = _games_to_win(series_fmt)
+
     matches: list[Match] = []
     for match_number, i in enumerate(range(0, bracket_size, 2), start=1):
         p1 = participant_ids[i]
@@ -46,6 +53,8 @@ def generate_bracket(tournament_id: uuid.UUID, session: Session) -> list[Match]:
             tournament_id=tournament_id,
             round=1,
             match_number=match_number,
+            format=series_fmt,
+            games_to_win=gtw,
             participant_1=p1,
             participant_2=p2,
             winner_id=p1 if p2 is None else (p2 if p1 is None else None),
@@ -95,6 +104,8 @@ def advance_winner(match: Match, session: Session) -> Match | None:
             tournament_id=match.tournament_id,
             round=next_round,
             match_number=next_match_number,
+            format=match.format,
+            games_to_win=match.games_to_win,
         )
         session.add(next_match)
 

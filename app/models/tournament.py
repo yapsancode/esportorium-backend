@@ -21,14 +21,22 @@ class TournamentStatus(str, Enum):
     cancelled = "cancelled"
 
 
+class SeriesFormat(str, Enum):
+    bo1 = "bo1"
+    bo3 = "bo3"
+    bo5 = "bo5"
+
+
 class Tournament(SQLModel, table=True):
     __tablename__ = "tournaments"
 
     id: uuid.UUID = Field(default_factory=uuid4, primary_key=True)
     name: str = Field(max_length=100, index=True)
     description: str | None = Field(default=None)
-    game: str = Field(max_length=100)
+    game: str = Field(default="mobile_legends", max_length=100)
+    region: str | None = Field(default=None, max_length=10)
     format: TournamentFormat = Field(default=TournamentFormat.single_elimination)
+    match_format: SeriesFormat = Field(default=SeriesFormat.bo1)
     status: TournamentStatus = Field(default=TournamentStatus.draft)
     max_teams: int = Field(default=8)
     prize_pool: float | None = Field(default=None)
