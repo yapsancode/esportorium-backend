@@ -1,7 +1,7 @@
-import math
 import uuid
+from datetime import datetime, timezone
 
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.models.match import Match, MatchStatus
 from app.models.registration import Registration, RegistrationStatus
@@ -59,3 +59,52 @@ def generate_bracket(tournament_id: uuid.UUID, session: Session) -> list[Match]:
         session.refresh(match)
 
     return matches
+
+
+def advance_winner(match: Match, session: Session) -> Match | None:
+    """
+    Seed the winner of a completed match into the appropriate slot of the next-round
+    match. Creates that match if it doesn't exist yet. Returns None when the completed
+    match was the grand final (only match in its round).
+    """
+    round_match_count = session.exec(
+        select(func.count(Match.id)).where(
+            Match.tournament_id == match.tournament_id,
+            Match.round == match.round,
+        )
+    ).one()
+
+    if round_match_count == 1:
+        # Grand final — nothing to advance to.
+        return None
+
+    next_round = match.round + 1
+    next_match_number = (match.match_number + 1) // 2
+    fills_slot_1 = match.match_number % 2 == 1
+
+    next_match = session.exec(
+        select(Match).where(
+            Match.tournament_id == match.tournament_id,
+            Match.round == next_round,
+            Match.match_number == next_match_number,
+        )
+    ).first()
+
+    if next_match is None:
+        next_match = Match(
+            tournament_id=match.tournament_id,
+            round=next_round,
+            match_number=next_match_number,
+        )
+        session.add(next_match)
+
+    if fills_slot_1:
+        next_match.participant_1 = match.winner_id
+    else:
+        next_match.participant_2 = match.winner_id
+
+    next_match.updated_at = datetime.now(timezone.utc)
+    session.add(next_match)
+    session.commit()
+    session.refresh(next_match)
+    return next_match

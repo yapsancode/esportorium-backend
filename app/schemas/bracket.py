@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.match import MatchStatus
 
@@ -32,3 +32,9 @@ class RoundPublic(BaseModel):
 class BracketPublic(BaseModel):
     tournament_id: uuid.UUID
     rounds: list[RoundPublic]
+
+
+class ScoreReport(BaseModel):
+    score_1: int = Field(ge=0)
+    score_2: int = Field(ge=0)
+    winner_id: uuid.UUID
