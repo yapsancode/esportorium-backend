@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Esportorium is a FastAPI SaaS backend. The project is in early scaffolding — most files exist as stubs with placeholder comments.
+Esportorium is a FastAPI SaaS backend for **Mobile Legends Bang Bang (MLBB) tournaments in SEA**.
+Organizers create and manage tournaments. Players register, join teams, and compete.
+Target market: local SEA esports organizers (MY, ID, PH, TH, SG) currently using Challonge, Toornament, or manual methods.
 
 ## Stack
 
@@ -12,6 +14,9 @@ Esportorium is a FastAPI SaaS backend. The project is in early scaffolding — m
 - **SQLModel** 0.0.33 (built on SQLAlchemy 2.0 + Pydantic v2) — ORM and schema validation
 - **PostgreSQL** via `psycopg2-binary`
 - **python-dotenv** — environment variable loading
+- **passlib[bcrypt]** — password hashing
+- **python-jose[cryptography]** — JWT tokens
+- **pydantic-settings** — environment variable validation
 
 ## Development Commands
 
@@ -44,40 +49,95 @@ pytest app/tests/test_foo.py
 
 ```
 app/
-  main.py          # FastAPI app instantiation, router registration
+  main.py              # FastAPI app, lifespan, router registration
   core/
-    config.py      # Settings loaded from environment variables
-    database.py    # SQLModel engine, session factory, get_session dependency
-    security.py    # Password hashing and JWT creation/verification
-  models/          # SQLModel table models (DB schema)
-  schemas/         # Pydantic request/response schemas (separate from DB models)
-  api/             # Route handlers, organized by resource
-  services/        # Business logic layer between routers and DB
-  tests/           # pytest test suite
+    config.py          # Settings via pydantic-settings, loaded from .env
+    database.py        # SQLModel engine, session factory, get_session dependency
+    security.py        # Password hashing, JWT creation/verification
+    dependencies.py    # get_current_user, require_role(), require_min_role()
+  models/              # SQLModel table models (DB schema)
+    user.py            # User, UserRole enum, UserPlan enum
+    tournament.py      # Tournament, TournamentStatus, TournamentFormat enum
+    registration.py    # Registration, RegistrationStatus enum
+    match.py           # Match (series), MatchStatus enum
+    dispute.py         # Dispute, DisputeStatus enum
+  schemas/             # Pydantic request/response schemas (separate from DB models)
+  api/                 # Route handlers, organized by resource
+    auth.py            # /auth/* routes
+    tournaments.py     # /tournaments/* routes
+    registrations.py   # /tournaments/{id}/register routes
+    brackets.py        # /tournaments/{id}/bracket routes
+    matches.py         # /matches/{id}/score routes
+    disputes.py        # /disputes/* routes
+  services/            # Business logic layer
+    auth.py            # User creation, login logic
+    bracket.py         # Bracket generation, winner advancement
+  tests/               # pytest test suite
 ```
 
-### Key Design Patterns
+## Key Design Patterns
 
-- **SQLModel** is used as the single source of truth for both ORM models (`table=True`) and Pydantic validation schemas — keep DB models in `models/` and API-facing schemas in `schemas/` to avoid tight coupling.
-- **`get_session`** dependency (to be defined in `core/database.py`) should use `yield` to provide a session per request.
-- **`core/config.py`** should expose a `Settings` class using `pydantic-settings` (or `BaseSettings`) so all env vars are validated at startup.
-- The project targets a multi-tenant SaaS structure — `organization.py` and `user.py` models are the foundational entities.
+- **SQLModel** is the single source of truth for ORM models (`table=True`) — keep DB models in `models/` and API schemas in `schemas/` to avoid tight coupling.
+- **`get_session`** dependency uses `yield` to provide a session per request.
+- **`core/config.py`** exposes a `Settings` class via `pydantic-settings` — all env vars validated at startup.
+- **`core/dependencies.py`** contains all auth and role guards — always use these, never inline role checks in routes.
+- All timestamps use `lambda: datetime.now(timezone.utc)` — never `datetime.utcnow()` (deprecated).
+- All IDs are UUIDs using `default_factory=uuid.uuid4`.
+- Soft deletes preferred over hard deletes where history matters (e.g. registrations).
+
+---
 
 ## Product Context
 
-Esportorium is an esports tournament platform for SEA organizers.
-Organizers create tournaments, players register and compete.
+Esportorium is built specifically for **Mobile Legends Bang Bang (MLBB)** tournaments in SEA.
+This is not a generic tournament platform — all features are designed around MLBB's game structure.
+
+### Target Regions
+MY, ID, PH, TH, SG
 
 ### User Roles (stored in users.role)
+```
 player → team_captain → organizer → moderator → admin → super_admin
+```
 
 ### Plans (stored in users.plan)
+```
 free | pro | business | enterprise
+```
 
-### Core Feature Loop (build in this order)
-1. Auth (register, login, refresh, logout)
-2. Tournament CRUD
-3. Player registration
-4. Bracket generation
-5. Score reporting
-6. Disputes
+### MLBB-Specific Structure
+- **Teams:** 5 starters + 1 substitute. Player roles: roamer, gold, exp, mid, jungler, substitute (optional/flexible)
+- **Match formats:** bo1, bo3, bo5 — matches are series, each containing individual games
+- **Draft system:** Each game has hero picks and bans tracked per team per phase
+- **Regions:** Tournaments and teams are tagged with SEA region codes
+
+---
+
+## What's Built
+
+- [x] Auth — register, login, refresh, logout (JWT with role + plan in token)
+- [x] Role guards — `get_current_user`, `require_role()`, `require_min_role()`
+- [x] Tournament CRUD — organizer only, with role + plan enforcement
+- [x] Player registration — join, withdraw (soft cancel), re-register
+- [x] Bracket generation — single elimination, handles byes
+- [x] Score reporting — per match, advances winner to next round
+- [x] Disputes — raise, view, resolve, resets match for re-reporting
+
+## What's In Progress
+
+- [ ] MLBB tweaks — team roles, match series (BO1/BO3/BO5), per-game results, hero draft/ban tracking
+- [ ] Team management endpoints
+- [ ] Frontend (Next.js — separate repo)
+- [ ] Billing (Stripe)
+- [ ] Deployment
+
+---
+
+## Core Feature Loop (for reference)
+1. ✅ Auth
+2. ✅ Tournament CRUD
+3. ✅ Player registration
+4. ✅ Bracket generation
+5. ✅ Score reporting
+6. ✅ Disputes
+7. 🔄 MLBB-specific game + draft tracking
