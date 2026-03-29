@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.database import get_session
@@ -61,9 +61,14 @@ def raise_dispute(
 def list_open_disputes(
     current_user: Annotated[User, Depends(require_min_role(UserRole.moderator))],
     session: Annotated[Session, Depends(get_session)],
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ) -> list[Dispute]:
     return session.exec(
-        select(Dispute).where(Dispute.status != DisputeStatus.resolved)
+        select(Dispute)
+        .where(Dispute.status != DisputeStatus.resolved)
+        .offset(offset)
+        .limit(limit)
     ).all()
 
 

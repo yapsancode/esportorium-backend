@@ -57,18 +57,23 @@ app/
     dependencies.py    # get_current_user, require_role(), require_min_role()
   models/              # SQLModel table models (DB schema)
     user.py            # User, UserRole enum, UserPlan enum
-    tournament.py      # Tournament, TournamentStatus, TournamentFormat enum
+    tournament.py      # Tournament, TournamentStatus, TournamentFormat, SeriesFormat enums
     registration.py    # Registration, RegistrationStatus enum
     match.py           # Match (series), MatchStatus enum
     dispute.py         # Dispute, DisputeStatus enum
+    team.py            # Team, TeamMember, TeamMemberRole enum
+    game.py            # Game (single game within a match series)
+    draft.py           # DraftEntry (hero picks/bans per game), DraftAction enum
   schemas/             # Pydantic request/response schemas (separate from DB models)
   api/                 # Route handlers, organized by resource
     auth.py            # /auth/* routes
-    tournaments.py     # /tournaments/* routes
+    users.py           # /users/me route
+    tournaments.py     # /tournaments/* routes (paginated, filterable)
     registrations.py   # /tournaments/{id}/register routes
     brackets.py        # /tournaments/{id}/bracket routes
     matches.py         # /matches/{id}/score routes
-    disputes.py        # /disputes/* routes
+    disputes.py        # /disputes/* routes (paginated)
+    games.py           # /matches/{id}/games routes
   services/            # Business logic layer
     auth.py            # User creation, login logic
     bracket.py         # Bracket generation, winner advancement
@@ -86,6 +91,15 @@ app/
 - Soft deletes preferred over hard deletes where history matters (e.g. registrations).
 
 ---
+
+"Schema migrations — SQLModel's create_all() only creates new tables, 
+it never alters existing ones. When adding new columns to existing models, 
+always provide the raw ALTER TABLE SQL alongside the model change so it 
+can be run manually in pgAdmin during development. In production, use 
+Alembic for migrations."
+
+Also, for any future model changes in this codebase, always include 
+the ALTER TABLE migration SQL in your response.
 
 ## Product Context
 
@@ -122,10 +136,12 @@ free | pro | business | enterprise
 - [x] Bracket generation — single elimination, handles byes
 - [x] Score reporting — per match, advances winner to next round
 - [x] Disputes — raise, view, resolve, resets match for re-reporting
+- [x] MLBB game + draft tracking — BO1/BO3/BO5 series, per-game results, hero pick/ban recording
+- [x] Pagination + filtering — limit/offset on list endpoints, tournament filter by status/game/region
+- [x] GET /users/me — returns current user's profile
 
 ## What's In Progress
 
-- [ ] MLBB tweaks — team roles, match series (BO1/BO3/BO5), per-game results, hero draft/ban tracking
 - [ ] Team management endpoints
 - [ ] Frontend (Next.js — separate repo)
 - [ ] Billing (Stripe)
@@ -140,4 +156,4 @@ free | pro | business | enterprise
 4. ✅ Bracket generation
 5. ✅ Score reporting
 6. ✅ Disputes
-7. 🔄 MLBB-specific game + draft tracking
+7. ✅ MLBB-specific game + draft tracking

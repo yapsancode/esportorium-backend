@@ -9,6 +9,7 @@ from app.api.games import router as games_router
 from app.api.matches import router as matches_router
 from app.api.registrations import router as registrations_router
 from app.api.tournaments import router as tournaments_router
+from app.api.users import router as users_router
 from app.core.config import get_settings
 from app.core.database import create_db_and_tables
 
@@ -38,6 +39,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(users_router)
 app.include_router(tournaments_router)
 app.include_router(registrations_router)
 app.include_router(brackets_router)

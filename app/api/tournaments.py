@@ -2,12 +2,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.database import get_session
 from app.core.dependencies import get_current_user, require_min_role
-from app.models.tournament import Tournament
+from app.models.tournament import Tournament, TournamentStatus
 from app.models.user import User, UserRole
 from app.schemas.tournament import TournamentCreate, TournamentPublic, TournamentUpdate
 
@@ -30,8 +30,21 @@ def create_tournament(
 @router.get("", response_model=list[TournamentPublic])
 def list_tournaments(
     session: Annotated[Session, Depends(get_session)],
+    status: TournamentStatus | None = Query(default=None),
+    game: str | None = Query(default=None),
+    region: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ) -> list[Tournament]:
-    return session.exec(select(Tournament)).all()
+    query = select(Tournament)
+    if status is not None:
+        query = query.where(Tournament.status == status)
+    if game is not None:
+        query = query.where(Tournament.game == game)
+    if region is not None:
+        query = query.where(Tournament.region == region)
+    query = query.offset(offset).limit(limit)
+    return session.exec(query).all()
 
 
 @router.get("/{tournament_id}", response_model=TournamentPublic)
