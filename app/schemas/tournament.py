@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from app.models.tournament import SeriesFormat, TournamentFormat, TournamentStatus
+from app.models.tournament import SeriesFormat, TournamentFormat, TournamentStatus, TournamentType
 
 
 class TournamentCreate(BaseModel):
@@ -17,6 +17,15 @@ class TournamentCreate(BaseModel):
     prize_pool: float | None = Field(default=None, ge=0)
     start_date: datetime | None = None
     end_date: datetime | None = None
+    tournament_type: TournamentType = TournamentType.online
+    venue_name: str | None = Field(default=None, max_length=200)
+    venue_address: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def venue_name_required_for_physical(self) -> "TournamentCreate":
+        if self.tournament_type in (TournamentType.physical, TournamentType.hybrid) and not self.venue_name:
+            raise ValueError("venue_name is required for physical and hybrid tournaments")
+        return self
 
 
 class TournamentUpdate(BaseModel):
@@ -31,6 +40,15 @@ class TournamentUpdate(BaseModel):
     prize_pool: float | None = Field(default=None, ge=0)
     start_date: datetime | None = None
     end_date: datetime | None = None
+    tournament_type: TournamentType | None = None
+    venue_name: str | None = Field(default=None, max_length=200)
+    venue_address: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def venue_name_required_for_physical(self) -> "TournamentUpdate":
+        if self.tournament_type in (TournamentType.physical, TournamentType.hybrid) and not self.venue_name:
+            raise ValueError("venue_name is required for physical and hybrid tournaments")
+        return self
 
 
 class TournamentPublic(BaseModel):
@@ -49,5 +67,8 @@ class TournamentPublic(BaseModel):
     organizer_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    tournament_type: TournamentType
+    venue_name: str | None
+    venue_address: str | None
 
     model_config = {"from_attributes": True}

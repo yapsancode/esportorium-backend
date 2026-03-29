@@ -27,6 +27,12 @@ class SeriesFormat(str, Enum):
     bo5 = "bo5"
 
 
+class TournamentType(str, Enum):
+    online = "online"
+    physical = "physical"
+    hybrid = "hybrid"
+
+
 class Tournament(SQLModel, table=True):
     __tablename__ = "tournaments"
 
@@ -42,6 +48,9 @@ class Tournament(SQLModel, table=True):
     prize_pool: float | None = Field(default=None)
     start_date: datetime | None = Field(default=None)
     end_date: datetime | None = Field(default=None)
+    tournament_type: TournamentType = Field(default=TournamentType.online)
+    venue_name: str | None = Field(default=None, max_length=200)
+    venue_address: str | None = Field(default=None, max_length=500)
 
     organizer_id: uuid.UUID = Field(foreign_key="users.id", index=True)
 
