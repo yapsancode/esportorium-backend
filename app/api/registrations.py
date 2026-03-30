@@ -10,7 +10,7 @@ from app.core.dependencies import get_current_user, require_min_role
 from app.models.registration import Registration, RegistrationStatus
 from app.models.tournament import Tournament, TournamentStatus
 from app.models.user import User, UserRole
-from app.schemas.registration import RegistrationPublic
+from app.schemas.registration import RegistrationPublic, RegistrationWithUser
 
 router = APIRouter(prefix="/tournaments/{tournament_id}", tags=["registrations"])
 
@@ -70,21 +70,36 @@ def register_for_tournament(
     return registration
 
 
-@router.get("/registrations", response_model=list[RegistrationPublic])
+@router.get("/registrations", response_model=list[RegistrationWithUser])
 def list_registrations(
     tournament_id: uuid.UUID,
     current_user: Annotated[User, Depends(require_min_role(UserRole.organizer))],
     session: Annotated[Session, Depends(get_session)],
-) -> list[Registration]:
+) -> list[RegistrationWithUser]:
     tournament = session.get(Tournament, tournament_id)
     if not tournament:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
     if tournament.organizer_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this tournament")
 
-    return session.exec(
-        select(Registration).where(Registration.tournament_id == tournament_id)
+    rows = session.exec(
+        select(Registration, User)
+        .join(User, Registration.user_id == User.id)
+        .where(Registration.tournament_id == tournament_id)
     ).all()
+
+    return [
+        RegistrationWithUser(
+            id=reg.id,
+            tournament_id=reg.tournament_id,
+            user_id=reg.user_id,
+            status=reg.status,
+            registered_at=reg.registered_at,
+            updated_at=reg.updated_at,
+            user={"id": user.id, "username": user.username, "display_name": user.display_name},
+        )
+        for reg, user in rows
+    ]
 
 
 @router.delete("/register", status_code=status.HTTP_204_NO_CONTENT)

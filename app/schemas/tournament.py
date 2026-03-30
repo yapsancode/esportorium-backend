@@ -6,6 +6,14 @@ from pydantic import BaseModel, Field, model_validator
 from app.models.tournament import SeriesFormat, TournamentFormat, TournamentStatus, TournamentType
 
 
+class OrganizerBasic(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class TournamentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str | None = None
@@ -65,10 +73,11 @@ class TournamentPublic(BaseModel):
     start_date: datetime | None
     end_date: datetime | None
     organizer_id: uuid.UUID
+    organizer: OrganizerBasic
     created_at: datetime
     updated_at: datetime
     tournament_type: TournamentType
     venue_name: str | None
     venue_address: str | None
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": False}

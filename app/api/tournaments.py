@@ -9,9 +9,17 @@ from app.core.database import get_session
 from app.core.dependencies import get_current_user, require_min_role
 from app.models.tournament import Tournament, TournamentStatus
 from app.models.user import User, UserRole
-from app.schemas.tournament import TournamentCreate, TournamentPublic, TournamentUpdate
+from app.schemas.tournament import OrganizerBasic, TournamentCreate, TournamentPublic, TournamentUpdate
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
+
+
+def _to_public(tournament: Tournament, session: Session) -> TournamentPublic:
+    organizer = session.get(User, tournament.organizer_id)
+    return TournamentPublic(
+        **tournament.model_dump(),
+        organizer=OrganizerBasic.model_validate(organizer),
+    )
 
 
 @router.post("", response_model=TournamentPublic, status_code=status.HTTP_201_CREATED)
@@ -19,12 +27,12 @@ def create_tournament(
     data: TournamentCreate,
     current_user: Annotated[User, Depends(require_min_role(UserRole.organizer))],
     session: Annotated[Session, Depends(get_session)],
-) -> Tournament:
+) -> TournamentPublic:
     tournament = Tournament(**data.model_dump(), organizer_id=current_user.id)
     session.add(tournament)
     session.commit()
     session.refresh(tournament)
-    return tournament
+    return _to_public(tournament, session)
 
 
 @router.get("", response_model=list[TournamentPublic])
@@ -35,7 +43,7 @@ def list_tournaments(
     region: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-) -> list[Tournament]:
+) -> list[TournamentPublic]:
     query = select(Tournament)
     if status is not None:
         query = query.where(Tournament.status == status)
@@ -44,18 +52,19 @@ def list_tournaments(
     if region is not None:
         query = query.where(Tournament.region == region)
     query = query.offset(offset).limit(limit)
-    return session.exec(query).all()
+    tournaments = session.exec(query).all()
+    return [_to_public(t, session) for t in tournaments]
 
 
 @router.get("/{tournament_id}", response_model=TournamentPublic)
 def get_tournament(
     tournament_id: uuid.UUID,
     session: Annotated[Session, Depends(get_session)],
-) -> Tournament:
+) -> TournamentPublic:
     tournament = session.get(Tournament, tournament_id)
     if not tournament:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
-    return tournament
+    return _to_public(tournament, session)
 
 
 @router.patch("/{tournament_id}", response_model=TournamentPublic)
@@ -64,7 +73,7 @@ def update_tournament(
     data: TournamentUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
-) -> Tournament:
+) -> TournamentPublic:
     tournament = session.get(Tournament, tournament_id)
     if not tournament:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
@@ -79,7 +88,7 @@ def update_tournament(
     session.add(tournament)
     session.commit()
     session.refresh(tournament)
-    return tournament
+    return _to_public(tournament, session)
 
 
 @router.delete("/{tournament_id}", status_code=status.HTTP_204_NO_CONTENT)
