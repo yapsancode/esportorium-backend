@@ -7,6 +7,14 @@ from app.models.match import MatchStatus
 from app.models.tournament import SeriesFormat
 
 
+class ParticipantUser(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class MatchPublic(BaseModel):
     id: uuid.UUID
     tournament_id: uuid.UUID
@@ -17,6 +25,9 @@ class MatchPublic(BaseModel):
     participant_1: uuid.UUID | None
     participant_2: uuid.UUID | None
     winner_id: uuid.UUID | None
+    participant_1_user: ParticipantUser | None = None
+    participant_2_user: ParticipantUser | None = None
+    winner_user: ParticipantUser | None = None
     team_1_wins: int
     team_2_wins: int
     score_1: int
